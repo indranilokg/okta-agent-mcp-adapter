@@ -1,12 +1,13 @@
-# Okta Agent Proxy
+# Okta MCP Adapter
 
-A production-ready proxy for MCP (Model Context Protocol) clients with OAuth 2.1 authentication, multi-agent support, and cross-app token exchange.
+An unofficial prototype adapter for MCP (Model Context Protocol) clients with OAuth 2.1 authentication, multi-agent support, and cross-app token exchange. For evaluation and testing purposes only.
+
 
 ## Overview
 
 **Status**: ✅ Complete (113 tests passing)
 
-The Okta Agent Proxy provides:
+The Okta MCP Adapter provides:
 - ✅ Multi-backend MCP proxying with path-based routing
 - ✅ Okta OAuth 2.1 JWT validation with JWKS caching
 - ✅ RFC-compliant ID-JAG token exchange for backend access
@@ -27,7 +28,7 @@ cp env.template .env
 pip install -r requirements.txt
 pytest tests/  # 113 tests, all passing
 
-# Start agent proxy
+# Start agent adapter
 python -m okta_agent_proxy.main http
 # or: ./scripts/run_gateway.sh
 ```
@@ -37,13 +38,12 @@ python -m okta_agent_proxy.main http
 ### .env (Environment Variables)
 ```bash
 OKTA_DOMAIN=dev-12345.okta.com
-OKTA_CLIENT_ID=0oa1234567890abcdef
-OKTA_CLIENT_SECRET=xxxxxxxxxxxx
-OKTA_ISSUER=https://dev-12345.okta.com
 GATEWAY_BASE_URL=http://localhost:8000
 GATEWAY_PORT=8000
 LOG_LEVEL=INFO
 ```
+
+**Note**: Agent credentials (client_id, private_key) are configured in `config/config.yaml`, not in `.env`
 
 ### config/config.yaml (Backends & Agents)
 ```yaml
@@ -89,7 +89,7 @@ agents:
 ```
 MCP Client (X-Agent-ID: cursor + Bearer Token)
     ↓
-Agent Proxy
+MCP Adapter
 ├─ 1. Validate Okta JWT
 ├─ 2. Extract Agent ID
 ├─ 3. Load Agent Config (backend_access)
@@ -235,7 +235,7 @@ Allow → Forward to backend
 
 **Import errors**: `pip install -r requirements.txt --force-reinstall`
 
-**Okta token validation fails**: Verify `OKTA_DOMAIN`, `OKTA_CLIENT_ID`, `OKTA_ISSUER` in `.env`
+**Okta token validation fails**: Verify `OKTA_DOMAIN` in `.env`
 
 **Agent not found**: Add agent to `config/config.yaml` and ensure `X-Agent-ID` header matches
 
@@ -277,7 +277,7 @@ Visual architecture and sequence diagrams are available in the `/docs/` folder:
 
 ## Status
 
-✅ **Production Ready** - Ready for integration testing with real Okta tenants and MCP servers
+⚠️ **Unofficial Prototype for Evaluation Only** - This is an unofficial prototype for evaluation and testing purposes. It should not be used in production environments. Use at your own risk.
 
 License: Apache 2.0
 
