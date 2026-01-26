@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "okta-agent-proxy"
+version = "1.0.0"
+description = "Okta Agent Proxy - A proxy for MCP clients with OAuth 2.1 authentication and multi-agent support"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Okta", email = "devex@okta.com"}
+]
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "fastmcp>=2.0.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "httpx>=0.25.0",
+    "cachetools>=5.3.0",
+    "python-jose>=3.3.0",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0.0",
+    "okta-sdk>=6.0.0",
+    "structlog>=23.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.12.0",
+    "flake8>=6.1.0",
+    "mypy>=1.7.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/okta-samples/okta-agent-proxy"
+Documentation = "https://github.com/okta-samples/okta-agent-proxy#readme"
+Repository = "https://github.com/okta-samples/okta-agent-proxy.git"
+Issues = "https://github.com/okta-samples/okta-agent-proxy/issues"
+
+[tool.setuptools]
+packages = ["okta_agent_proxy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-v --tb=short"
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+

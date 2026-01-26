@@ -1,0 +1,38 @@
+# Okta MCP Gateway Configuration
+
+gateway:
+  name: "Okta MCP Gateway"
+  version: "1.0.0"
+  description: "Okta-secured MCP proxy gateway"
+  host: "0.0.0.0"
+  port: 8000
+  scheme: "https"
+
+# Token cache settings
+cache:
+  backend_tokens:
+    max_size: 50000
+    ttl_seconds: 3600  # 1 hour
+
+# Backend MCP servers
+backends:
+  employees:
+    name: "employees"
+    url: "https://okta-sample-employee-mcp-server.onrender.com"
+    paths:
+      - "/hr"
+      - "/employees"
+    description: "Employee management MCP server"
+    timeout_seconds: 30
+    auth_method: "okta-cross-app"
+    auth_config:
+      authorization_server_id: "mcp_employees_server"
+      scopes:
+        - "mcp:read"
+        - "mcp:write"
+
+# Logging
+logging:
+  level: "INFO"
+  format: "json"
+
