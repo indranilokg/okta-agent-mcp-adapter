@@ -156,62 +156,60 @@ sequenceDiagram
 
 ---
 
-## Frontend Login Flow: Agent Authentication via Adapter Discovery
+## Frontend Login Flow: Agent Authentication via Adapter Discovery (BFF Pattern)
 
-**Key Pattern**: Adapter proxies Okta discovery metadata and provides its own Dynamic Client Registration (DCR) endpoint with pre-configured agent credentials.
+**Key Pattern**: Adapter acts as Backend-for-Frontend (BFF), proxying Okta discovery and intercepting the token endpoint. Agents only interact with adapter URLs, not Okta directly.
 
 ```mermaid
 sequenceDiagram
     participant Agent as Claude Code<br/>MCP Agent
     participant Browser as Browser<br/>OAuth Redirect
-    participant Adapter as Okta MCP Adapter<br/>Discovery + DCR
-    participant DCREndpoint as Adapter DCR<br/>/oauth2/register
-    participant OktaDisc as Okta Discovery<br/>/.well-known/oauth-*
-    participant AuthzServer as Okta<br/>Authorization Server
-    participant Token as Okta<br/>Token Endpoint
+    participant Adapter as Okta MCP Adapter<br/>BFF Pattern
+    participant OktaAuth as Okta<br/>Authorization Server
+    participant OktaToken as Okta<br/>Token Endpoint (hidden)
 
-    Agent->>Adapter: 1. Fetch adapter discovery metadata<br/>GET /.well-known/oauth-authorization-server
+    Agent->>Adapter: 1. Fetch discovery metadata<br/>GET /.well-known/oauth-authorization-server
     
-    Adapter->>OktaDisc: (Proxy) Fetch Okta metadata<br/>for authorization_server endpoints
+    Adapter->>OktaAuth: (Proxy) Fetch Okta metadata
+    OktaAuth-->>Adapter: Returns Okta endpoints
     
-    OktaDisc-->>Adapter: Returns Okta metadata:<br/>- authorize_endpoint (Okta)<br/>- token_endpoint (Okta)<br/>- jwks_uri (Okta)
+    Adapter->>Adapter: Enhance metadata:<br/>- authorize_endpoint: okta.../authorize<br/>- token_endpoint: adapter/oauth2/v1/token<br/>- registration_endpoint: adapter/register<br/>- jwks_uri: okta.../keys
     
-    Adapter->>Adapter: Enhance metadata:<br/>- Add registration_endpoint<br/>(points to adapter DCR)
+    Adapter-->>Agent: Returns enhanced metadata<br/>(adapter is the only URL agent sees)
     
-    Adapter-->>Agent: Returns enhanced metadata:<br/>- Okta OAuth endpoints<br/>- Adapter DCR endpoint
+    Agent->>Adapter: 2. Get pre-configured credentials<br/>POST /oauth2/register?agent=claude-code
     
-    Agent->>DCREndpoint: 2. Register/get pre-configured credentials<br/>POST /oauth2/register<br/>(agent_name or client_assertion)
+    Adapter->>Adapter: Lookup agent in config.yaml
+    Adapter-->>Agent: Returns pre-configured:<br/>- client_id (from config.yaml)<br/>- redirect_uris
     
-    DCREndpoint->>DCREndpoint: Lookup pre-configured<br/>agent in config.yaml<br/>or admin-configured agents
+    Agent->>Agent: Generate PKCE code & state
     
-    DCREndpoint-->>Agent: Returns:<br/>- client_id (pre-configured)<br/>- client_secret (or empty)
+    Agent->>Browser: 3. Redirect to OKTA authorize<br/>(endpoint from metadata)
     
-    Agent->>Agent: Generate PKCE code<br/>& state parameter
+    Browser->>OktaAuth: User authentication & consent
+    OktaAuth-->>Browser: Authorization code
     
-    Agent->>Browser: 3. Redirect to Okta authorization<br/>GET https://okta.../oauth2/authorize?<br/>client_id, redirect_uri,<br/>scope, state, code_challenge
+    Browser->>Adapter: 4. Redirect to ADAPTER callback<br/>GET /oauth2/callback?code&state<br/>(redirect_uri = adapter endpoint)
     
-    Browser->>AuthzServer: User authentication & consent
-    AuthzServer-->>Browser: Authorization code
+    Adapter->>OktaToken: (Backend-for-Frontend)<br/>Exchange auth code at Okta<br/>(Agent never sees Okta token endpoint)
     
-    Browser->>Adapter: 4. Redirect callback to adapter<br/>GET /oauth2/callback?code&state
-    
-    Adapter->>Token: Exchange authorization code<br/>POST https://okta.../oauth2/v1/token<br/>code, client_id, client_secret,<br/>code_verifier (PKCE)
-    
-    Token-->>Adapter: Returns:<br/>- access_token (JWT)<br/>- id_token<br/>- refresh_token
+    OktaToken-->>Adapter: Returns tokens
     
     Adapter->>Adapter: Validate JWT signature<br/>using Okta JWKS
     
-    Adapter-->>Browser: 5. Redirect with tokens<br/>(or store in secure context)
+    Adapter-->>Browser: 5. Redirect with tokens
     
-    Browser->>Agent: Agent receives tokens<br/>& can use access_token<br/>for MCP tool calls
+    Browser->>Agent: Agent has tokens<br/>Ready for MCP calls
+    
+    Note over Adapter,OktaToken: ⚠️ Token endpoint is HIDDEN<br/>Only adapter calls Okta token endpoint
 ```
 
-**Why This Pattern?**
-- ✅ **Pre-configured credentials**: Agents don't need dynamic registration with Okta
-- ✅ **Centralized management**: Config defined in adapter (config.yaml)
-- ✅ **Enhanced discovery**: Adapter adds its own DCR endpoint to Okta's metadata
-- ✅ **Single adapter URL**: Agents only need adapter URL, not Okta URL
-- ✅ **Transparent OAuth**: Actual OAuth still happens with Okta (authorize/token endpoints)
+**BFF Pattern Benefits:**
+- ✅ **Adapter controls token exchange**: Can add logging, security checks, token transformation
+- ✅ **Hidden Okta complexity**: Agents only see adapter URLs
+- ✅ **Pre-configured credentials**: DCR returns client_id from config.yaml
+- ✅ **Single entry point**: All OAuth flows go through adapter
+- ✅ **Security**: Adapter can validate, filter, and transform tokens
 
 ---
 
