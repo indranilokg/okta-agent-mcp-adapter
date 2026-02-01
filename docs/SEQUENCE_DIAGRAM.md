@@ -1,4 +1,4 @@
-# Sequence Diagrams - Okta Agent Proxy Flow
+# Sequence Diagrams - Okta MCP Adapter Flow
 
 ## Complete Flow: Claude Code Agent to Employee MCP via Proxy
 
@@ -8,7 +8,7 @@ This diagram shows the complete request flow from Claude Code authentication thr
 participant ClaudeCode as Claude Code<br/>(Agent)
 participant Okta as Okta IdP<br/>(dev-xxxxx.okta.com)
 participant User as User<br/>(Approves login)
-participant Proxy as Agent Proxy<br/>(localhost:8000)
+participant Proxy as Adapter<br/>(localhost:8000)
 participant TargetOkta as Target Okta<br/>(cross-app)
 participant EmployeeMCP as Employee MCP<br/>(Backend)
 
@@ -146,7 +146,7 @@ end
 
 ```
 participant Agent as MCP Agent<br/>(Claude Code)
-participant Proxy as Agent Proxy
+participant Proxy as Adapter
 participant MCP as Backend MCP
 
 Agent->>Proxy: Request<br/>Bearer token + X-Agent-ID

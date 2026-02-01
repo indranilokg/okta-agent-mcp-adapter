@@ -3,101 +3,100 @@
 ## System Overview
 
 ```mermaid
+%%{init: {'flowchart': {'htmlLabels': true, 'curve': 'linear'}, 'theme': 'base', 'primaryColor': '#e1f5ff', 'primaryTextColor': '#000', 'fontSize': '18px'}}%%
 graph TB
-    subgraph Clients["🔐 Clients (Agents)"]
-        Cursor["Cursor/VSCode"]
-        Claude["Claude"]
-        Copilot["Copilot"]
+    subgraph Clients["🔐 Clients"]
+        Cursor["<b>Cursor</b><br/>VSCode"]
+        Claude["<b>Claude</b>"]
+        Copilot["<b>Copilot</b>"]
     end
 
     subgraph Adapter["🌐 Okta MCP Adapter"]
-        Main["main.py<br/>Entry Point"]
+        Main["<b>main.py</b><br/>Entry Point"]
         
-        subgraph Auth["🔑 Authentication Layer"]
-            OAuthDisc["OAuth Discovery<br/>/.well-known/oauth-*"]
-            DCR["Dynamic Client Registration<br/>/oauth2/register"]
-            TokenEP["Token Endpoint<br/>/oauth2/v1/token"]
-            Validator["OktaTokenValidator<br/>JWT validation"]
+        subgraph Auth["🔑 Authentication"]
+            OAuthDisc["<b>OAuth Discovery</b><br/>/.well-known/oauth-*"]
+            DCR["<b>DCR</b><br/>/oauth2/register"]
+            TokenEP["<b>Token EP</b><br/>/oauth2/v1/token"]
+            Validator["<b>Validator</b><br/>JWT validation"]
         end
         
-        subgraph Routing["📍 Request Routing"]
-            Middleware["Auth Middleware<br/>Extract token & agent"]
-            ProxyHandler["ProxyHandler<br/>Route to backend"]
-            SessionMgr["SessionManager<br/>Maintain MCP sessions"]
+        subgraph Routing["📍 Routing"]
+            Middleware["<b>Auth Middleware</b>"]
+            ProxyHandler["<b>ProxyHandler</b>"]
+            SessionMgr["<b>SessionManager</b>"]
         end
         
         subgraph Exchange["🔄 Token Exchange"]
-            CrossApp["OktaCrossAppAccessManager<br/>ID-JAG (RFC8693)"]
-            BackendRouter["BackendRouter<br/>Backend token logic"]
-            Cache["TokenCache<br/>Cache tokens"]
+            CrossApp["<b>CrossApp</b><br/>ID-JAG"]
+            BackendRouter["<b>BackendRouter</b>"]
+            Cache["<b>TokenCache</b>"]
         end
         
         subgraph Discovery["🔍 Discovery"]
-            MetadataClient["MetadataDiscoveryClient<br/>RFC9728 metadata"]
-            AuthzClient["BackendToolsDiscovery<br/>Get available tools"]
+            MetadataClient["<b>MetadataClient</b>"]
+            AuthzClient["<b>ToolsDiscovery</b>"]
         end
         
-        subgraph Storage["💾 Configuration"]
-            Store["InMemoryBackendStore<br/>SQLite backends/agents"]
-            Config["config.yaml<br/>Loaded settings"]
+        subgraph Storage["💾 Config"]
+            Store["<b>BackendStore</b>"]
+            Config["<b>config.yaml</b>"]
         end
     end
 
-    subgraph Backends["🛠️ Backend MCP Servers"]
-        Employees["Employee MCP<br/>Port 8001"]
-        Partners["Partner MCP<br/>etc"]
+    subgraph Backends["🛠️ Backend MCP"]
+        Employees["<b>Employee MCP</b>"]
+        Partners["<b>Partner MCP</b>"]
     end
 
-    subgraph Okta["☁️ Okta Authorization"]
-        AuthServer["Authorization Server<br/>ID-JAG target"]
-        JWKS["JWKS Endpoint<br/>Verify tokens"]
+    subgraph Okta["☁️ Okta"]
+        AuthServer["<b>Auth Server</b>"]
+        JWKS["<b>JWKS</b>"]
     end
 
-    %% Client flows
-    Cursor -->|OAuth flow| OAuthDisc
-    Claude -->|OAuth flow| OAuthDisc
-    Copilot -->|OAuth flow| OAuthDisc
+    Cursor -->|OAuth| OAuthDisc
+    Claude -->|OAuth| OAuthDisc
+    Copilot -->|OAuth| OAuthDisc
     
     OAuthDisc --> TokenEP
     DCR --> Config
     TokenEP --> Validator
-    TokenEP -->|Send token| CrossApp
+    TokenEP -->|token| CrossApp
     
-    %% Request flow
     Clients -->|tools/list| Middleware
     Middleware --> ProxyHandler
-    ProxyHandler -->|Get agent config| Store
-    ProxyHandler -->|Exchange token| BackendRouter
+    ProxyHandler -->|config| Store
+    ProxyHandler -->|exchange| BackendRouter
     
-    BackendRouter -->|Fresh manager| CrossApp
-    CrossApp -->|ID-JAG steps| AuthServer
-    CrossApp -->|Cache hit?| Cache
-    Cache -->|Verify JWT| JWKS
+    BackendRouter -->|manager| CrossApp
+    CrossApp -->|ID-JAG| AuthServer
+    CrossApp -->|cache?| Cache
+    Cache -->|verify| JWKS
     
-    ProxyHandler -->|Get/create session| SessionMgr
-    SessionMgr -->|Forward MCP request| Employees
+    ProxyHandler -->|session| SessionMgr
+    SessionMgr -->|request| Employees
     
-    ProxyHandler -->|Dynamic discovery| MetadataClient
-    ProxyHandler -->|List tools| AuthzClient
+    ProxyHandler -->|discovery| MetadataClient
+    ProxyHandler -->|tools| AuthzClient
     
-    Config -->|Load on startup| Store
-    Store -->|Query backends| BackendRouter
+    Config -->|load| Store
+    Store -->|query| BackendRouter
     
-    Employees -->|MCP response| SessionMgr
+    Employees -->|response| SessionMgr
     SessionMgr -->|JSON-RPC| Clients
     
-    AuthServer -->|Issue tokens| Cache
-    JWKS -->|Public keys| Validator
+    AuthServer -->|tokens| Cache
+    JWKS -->|keys| Validator
     
-    style Adapter fill:#e1f5ff
-    style Auth fill:#fff3e0
-    style Routing fill:#f3e5f5
-    style Exchange fill:#e8f5e9
-    style Discovery fill:#fce4ec
-    style Storage fill:#f1f8e9
-    style Okta fill:#ffe0b2
-    style Clients fill:#e0f2f1
-    style Backends fill:#f5f5f5
+    style Adapter fill:#e1f5ff,stroke:#0288d1,stroke-width:3px,font-size:16px
+    style Auth fill:#fff3e0,stroke:#f57c00,stroke-width:2px,font-size:15px
+    style Routing fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,font-size:15px
+    style Exchange fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,font-size:15px
+    style Discovery fill:#fce4ec,stroke:#c2185b,stroke-width:2px,font-size:15px
+    style Storage fill:#f1f8e9,stroke:#689f38,stroke-width:2px,font-size:15px
+    style Okta fill:#ffe0b2,stroke:#f57f17,stroke-width:2px,font-size:15px
+    style Clients fill:#e0f2f1,stroke:#00796b,stroke-width:2px,font-size:15px
+    style Backends fill:#f5f5f5,stroke:#424242,stroke-width:2px,font-size:15px
 ```
 
 ---
@@ -148,7 +147,7 @@ graph TB
 |-----------|------|---------|
 | **InMemoryBackendStore** | `storage/in_memory.py` | SQLite in-memory DB, loads YAML on startup |
 | **AgentModel / BackendModel** | `storage/models.py` | SQLAlchemy ORM models |
-| **GatewaySettings** | `config.py` | Pydantic config models |
+| **AdapterSettings** | `config.py` | Pydantic config models |
 
 ---
 
@@ -270,7 +269,7 @@ graph LR
     B -->|Parse YAML| D["Agents Table"]
     C -->|Register| E["BackendRouter"]
     D -->|Register| F["OktaTokenValidator"]
-    E & F -->|Initialize| G["Gateway Ready"]
+    E & F -->|Initialize| G["Adapter Ready"]
     G -->|Listen| H["Port 8000"]
 
     style A fill:#fff3e0
@@ -312,7 +311,7 @@ Agent uses Okta endpoints (from metadata) with pre-configured client_id
 
 ### 3. **Two Auth Methods**
 - **OAuth (for Agents)**: Copilot, Claude, Cursor → Okta
-- **Service Auth (for Backends)**: Gateway → Backend (static keys, basic auth, ID-JAG)
+- **Service Auth (for Backends)**: Adapter → Backend (static keys, basic auth, ID-JAG)
 
 ### 4. **Token Exchange Pipeline**
 ```
@@ -328,7 +327,7 @@ User ID Token (from Okta OAuth)
 ```
 
 ### 5. **Session Management**
-- Gateway maintains MCP `Session-Id` with each backend
+- Adapter maintains MCP `Session-Id` with each backend
 - Sessions cached per backend to avoid recreating
 - Used for stateful MCP interactions
 

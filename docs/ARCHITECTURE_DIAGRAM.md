@@ -1,4 +1,4 @@
-# Architecture Diagram - Okta Agent Proxy
+# Architecture Diagram - Okta MCP Adapter
 
 ## System Architecture
 
@@ -10,7 +10,7 @@ graph TB
         Copilot["🔵 Copilot<br/>(Agent: copilot)"]
     end
 
-    subgraph Proxy["Okta Agent Proxy<br/>(port 8000)"]
+    subgraph Proxy["Okta MCP Adapter<br/>(port 8000)"]
         FastMCP["FastMCP Server<br/>Streamable HTTP"]
         
         subgraph Auth_Layer["Authentication Layer"]
@@ -99,14 +99,14 @@ graph TB
 
     %% Styling
     classDef client fill:#4A90E2,stroke:#2E5C8A,stroke-width:2px,color:#fff
-    classDef gateway fill:#F5A623,stroke:#B86E1F,stroke-width:2px,color:#fff
+    classDef adapter fill:#F5A623,stroke:#B86E1F,stroke-width:2px,color:#fff
     classDef auth fill:#7ED321,stroke:#5FA919,stroke-width:2px,color:#fff
     classDef storage fill:#BD10E0,stroke:#8B0AA8,stroke-width:2px,color:#fff
     classDef okta fill:#00B4D8,stroke:#0077B6,stroke-width:2px,color:#fff
     classDef backend fill:#E84C3D,stroke:#A63028,stroke-width:2px,color:#fff
 
     class Cursor,ClaudeCode,Copilot client
-    class FastMCP,Router,ProxyReq gateway
+    class FastMCP,Router,ProxyReq adapter
     class TokenVal,AgentExt,AgentAuthZ,IdJagIssuer,IdJagEx auth
     class Store,AgentStore,AuditLog storage
     class OktaAuth,JWKS,OAuthServer okta
@@ -221,7 +221,7 @@ Proxy receives request
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│              Gateway Configuration                   │
+│              Adapter Configuration                   │
 ├──────────────────────────────────────────────────────┤
 │                                                      │
 │  Agent: cursor                                       │
@@ -254,37 +254,37 @@ Proxy receives request
 ```mermaid
 sequenceDiagram
     participant Agent as MCP Agent<br/>(cursor)
-    participant Gateway as Gateway
+    participant Adapter as Adapter
     participant TargetAuth as Target Auth Server
     participant Backend as Backend MCP
     
-    Agent->>Gateway: Bearer <okta_token>
-    activate Gateway
+    Agent->>Adapter: Bearer <okta_token>
+    activate Adapter
     
-    Gateway->>Gateway: Validate JWT
-    Gateway->>Gateway: Load agent config (cursor)
-    Gateway->>Gateway: Check backend access
+    Adapter->>Adapter: Validate JWT
+    Adapter->>Adapter: Load agent config (cursor)
+    Adapter->>Adapter: Check backend access
     
     alt Token in cache
-        Gateway->>Gateway: Use cached token
+        Adapter->>Adapter: Use cached token
     else Cache miss
-        Gateway->>TargetAuth: Step 1: Issue ID-JAG JWT<br/>(RFC8693)<br/>subject: user<br/>aud: target_auth_server<br/>signed with agent.private_key
+        Adapter->>TargetAuth: Step 1: Issue ID-JAG JWT<br/>(RFC8693)<br/>subject: user<br/>aud: target_auth_server<br/>signed with agent.private_key
         TargetAuth->>TargetAuth: Validate ID-JAG JWT
         
-        Gateway->>TargetAuth: Step 2: Exchange ID-JAG<br/>for access token<br/>(RFC7523)
-        TargetAuth->>Gateway: Return backend token
-        Gateway->>Gateway: Cache token (TTL: 3600s)
+        Adapter->>TargetAuth: Step 2: Exchange ID-JAG<br/>for access token<br/>(RFC7523)
+        TargetAuth->>Adapter: Return backend token
+        Adapter->>Adapter: Cache token (TTL: 3600s)
     end
     
-    deactivate Gateway
+    deactivate Adapter
     
-    Gateway->>Backend: Forward with backend token
+    Adapter->>Backend: Forward with backend token
     activate Backend
     Backend->>Backend: Validate token
     Backend->>Backend: Process request
-    Backend->>Gateway: Return response
+    Backend->>Adapter: Return response
     deactivate Backend
     
-    Gateway->>Agent: Return response
+    Adapter->>Agent: Return response
 ```
 
