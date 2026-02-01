@@ -285,6 +285,111 @@ sequenceDiagram
     Backend->>Adapter: Return response
     deactivate Backend
     
-    Adapter->>Agent: Return response
+    Adapter->>Agent: Agent receives tokens<br/>& can use access_token<br/>for MCP tool calls
+```
+
+---
+
+## Frontend Login Flow: Agent Authentication via Adapter Discovery
+
+**Key Pattern**: Adapter proxies Okta discovery metadata and provides its own Dynamic Client Registration (DCR) endpoint with pre-configured agent credentials.
+
+```mermaid
+sequenceDiagram
+    participant Agent as Claude Code<br/>MCP Agent
+    participant Browser as Browser<br/>OAuth Redirect
+    participant Adapter as Okta MCP Adapter<br/>Discovery + DCR
+    participant DCREndpoint as Adapter DCR<br/>/oauth2/register
+    participant OktaDisc as Okta Discovery<br/>/.well-known/oauth-*
+    participant AuthzServer as Okta<br/>Authorization Server
+    participant Token as Okta<br/>Token Endpoint
+
+    Agent->>Adapter: 1. Fetch adapter discovery metadata<br/>GET /.well-known/oauth-authorization-server
+    
+    Adapter->>OktaDisc: (Proxy) Fetch Okta metadata<br/>for authorization_server endpoints
+    
+    OktaDisc-->>Adapter: Returns Okta metadata:<br/>- authorize_endpoint (Okta)<br/>- token_endpoint (Okta)<br/>- jwks_uri (Okta)
+    
+    Adapter->>Adapter: Enhance metadata:<br/>- Add registration_endpoint<br/>(points to adapter DCR)
+    
+    Adapter-->>Agent: Returns enhanced metadata:<br/>- Okta OAuth endpoints<br/>- Adapter DCR endpoint
+    
+    Agent->>DCREndpoint: 2. Register/get pre-configured credentials<br/>POST /oauth2/register<br/>(agent_name or client_assertion)
+    
+    DCREndpoint->>DCREndpoint: Lookup pre-configured<br/>agent in config.yaml<br/>or admin-configured agents
+    
+    DCREndpoint-->>Agent: Returns:<br/>- client_id (pre-configured)<br/>- client_secret (or empty)
+    
+    Agent->>Agent: Generate PKCE code<br/>& state parameter
+    
+    Agent->>Browser: 3. Redirect to Okta authorization<br/>GET https://okta.../oauth2/authorize?<br/>client_id, redirect_uri,<br/>scope, state, code_challenge
+    
+    Browser->>AuthzServer: User authentication & consent
+    AuthzServer-->>Browser: Authorization code
+    
+    Browser->>Adapter: 4. Redirect callback to adapter<br/>GET /oauth2/callback?code&state
+    
+    Adapter->>Token: Exchange authorization code<br/>POST https://okta.../oauth2/v1/token<br/>code, client_id, client_secret,<br/>code_verifier (PKCE)
+    
+    Token-->>Adapter: Returns:<br/>- access_token (JWT)<br/>- id_token<br/>- refresh_token
+    
+    Adapter->>Adapter: Validate JWT signature<br/>using Okta JWKS
+    
+    Adapter-->>Browser: 5. Redirect with tokens<br/>(or store in secure context)
+    
+    Browser->>Agent: Agent receives tokens<br/>& can use access_token<br/>for MCP tool calls
+```
+
+**Why This Pattern?**
+- ✅ **Pre-configured credentials**: Agents don't need dynamic registration with Okta
+- ✅ **Centralized management**: Config defined in adapter (config.yaml)
+- ✅ **Enhanced discovery**: Adapter adds its own DCR endpoint to Okta's metadata
+- ✅ **Single adapter URL**: Agents only need adapter URL, not Okta URL
+- ✅ **Transparent OAuth**: Actual OAuth still happens with Okta (authorize/token endpoints)
+
+---
+
+## Request Flow Example: `tools/list`
+
+```mermaid
+sequenceDiagram
+    participant Client as Copilot
+    participant GW as Okta MCP Adapter<br/>main.py
+    participant Auth as OktaTokenValidator
+    participant Router as ProxyHandler
+    participant Exchanger as OktaCrossAppAccessManager
+    participant Cache as TokenCache
+    participant Okta as Okta<br/>Auth Server
+    participant MCP as Backend<br/>Employee MCP
+
+    Client->>GW: POST /employees<br/>tools/list<br/>+ Bearer Token
+    
+    GW->>Auth: Validate JWT
+    Auth->>Auth: Check audience<br/>& signature
+    Auth-->>GW: ✅ Valid token
+    
+    GW->>Router: proxy_request<br/>(method, token, agent)
+    Router->>Router: Extract agent<br/>from X-MCP-Agent
+    Router->>Router: Load agent config
+    
+    Router->>Exchanger: exchange_id_token<br/>_to_mcp_token
+    Exchanger->>Cache: Check cache<br/>for token
+    
+    alt Cache Hit
+        Cache-->>Exchanger: Return cached token
+    else Cache Miss
+        Exchanger->>Okta: STEP 1: ID-JAG<br/>token exchange
+        Okta-->>Exchanger: ID-JAG token
+        Exchanger->>Okta: STEP 3: Exchange<br/>for target token
+        Okta-->>Exchanger: MCP access token
+        Exchanger->>Cache: Store token
+    end
+    
+    Exchanger-->>Router: Backend token
+    Router->>MCP: POST /mcp<br/>tools/list<br/>+ Backend token
+    MCP-->>Router: tools array
+    
+    Router->>Router: Format response<br/>as JSON-RPC
+    Router-->>Client: JSON-RPC result<br/>with tools
 ```
 
