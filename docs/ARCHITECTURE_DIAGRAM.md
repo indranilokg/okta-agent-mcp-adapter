@@ -202,13 +202,6 @@ sequenceDiagram
     Adapter-->>Agent: 6. Return tokens to agent<br/>- access_token (ID token for ID-JAG)<br/>- refresh_token<br/>- id_token
 ```
 
-**BFF Pattern Benefits:**
-- ✅ **Adapter controls token exchange**: Can add logging, security checks, token transformation
-- ✅ **Hidden Okta complexity**: Agents only see adapter URLs
-- ✅ **Pre-configured credentials**: DCR returns client_id from config.yaml
-- ✅ **Single entry point**: All OAuth flows go through adapter
-- ✅ **Security**: Adapter can validate, filter, and transform tokens
-
 ---
 
 ## Request Flow Example: `tools/list`
