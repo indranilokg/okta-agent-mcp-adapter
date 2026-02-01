@@ -110,7 +110,13 @@ graph TB
 |-----------|------|---------|
 | **OktaTokenValidator** | `okta_validator.py` | JWT validation, JWKS caching, audience checking |
 | **OktaCrossAppAccessManager** | `cross_app_access.py` | ID-JAG token exchange (RFC8693) using Okta AI SDK |
-| **OAuth Endpoints** | `main.py` | DCR, authorize, token endpoints |
+| **OAuth Endpoints** | `main.py` | Discovery proxy, DCR endpoint, authorize, token endpoints |
+
+**Discovery Proxy Pattern**:
+- Adapter proxies Okta's `.well-known/oauth-authorization-server` metadata
+- Adds `registration_endpoint` pointing to adapter's `/oauth2/register` (DCR)
+- Adapter's DCR endpoint returns pre-configured `client_id` from `config.yaml`
+- Agents use adapter URL for discovery, but OAuth happens with Okta (authorize/token endpoints from metadata)
 
 ### 📍 Request Routing (`proxy/` + `middleware/`)
 
@@ -146,43 +152,65 @@ graph TB
 
 ---
 
-## Frontend Login Flow: Agent Authentication
+## Frontend Login Flow: Agent Authentication via Adapter Discovery
+
+**Key Pattern**: Adapter proxies Okta discovery metadata and provides its own Dynamic Client Registration (DCR) endpoint with pre-configured agent credentials.
 
 ```mermaid
 sequenceDiagram
     participant Agent as Claude Code<br/>MCP Agent
     participant Browser as Browser<br/>OAuth Redirect
-    participant Adapter as Okta MCP Adapter<br/>OAuth Endpoints
-    participant Discovery as Okta Discovery<br/>/.well-known/oauth-*
+    participant Adapter as Okta MCP Adapter<br/>Discovery + DCR
+    participant DCREndpoint as Adapter DCR<br/>/oauth2/register
+    participant OktaDisc as Okta Discovery<br/>/.well-known/oauth-*
     participant AuthzServer as Okta<br/>Authorization Server
     participant Token as Okta<br/>Token Endpoint
 
-    Agent->>Discovery: 1. Fetch adapter discovery metadata<br/>/.well-known/oauth-authorization-server
+    Agent->>Adapter: 1. Fetch adapter discovery metadata<br/>GET /.well-known/oauth-authorization-server
     
-    Discovery-->>Agent: Returns:<br/>- authorize_endpoint<br/>- token_endpoint<br/>- redirect_uris
+    Adapter->>OktaDisc: (Proxy) Fetch Okta metadata<br/>for authorization_server endpoints
+    
+    OktaDisc-->>Adapter: Returns Okta metadata:<br/>- authorize_endpoint (Okta)<br/>- token_endpoint (Okta)<br/>- jwks_uri (Okta)
+    
+    Adapter->>Adapter: Enhance metadata:<br/>- Add registration_endpoint<br/>(points to adapter DCR)
+    
+    Adapter-->>Agent: Returns enhanced metadata:<br/>- Okta OAuth endpoints<br/>- Adapter DCR endpoint
+    
+    Agent->>DCREndpoint: 2. Register/get pre-configured credentials<br/>POST /oauth2/register<br/>(agent_name or client_assertion)
+    
+    DCREndpoint->>DCREndpoint: Lookup pre-configured<br/>agent in config.yaml<br/>or admin-configured agents
+    
+    DCREndpoint-->>Agent: Returns:<br/>- client_id (pre-configured)<br/>- client_secret (or empty)
     
     Agent->>Agent: Generate PKCE code<br/>& state parameter
     
-    Agent->>Browser: 2. Redirect to authorization endpoint<br/>GET /oauth2/authorize?<br/>client_id, redirect_uri,<br/>scope, state, code_challenge
+    Agent->>Browser: 3. Redirect to Okta authorization<br/>GET https://okta.../oauth2/authorize?<br/>client_id, redirect_uri,<br/>scope, state, code_challenge
     
     Browser->>AuthzServer: User authentication & consent
     AuthzServer-->>Browser: Authorization code
     
-    Browser->>Adapter: 3. Redirect callback<br/>GET /oauth2/callback?code&state
+    Browser->>Adapter: 4. Redirect callback to adapter<br/>GET /oauth2/callback?code&state
     
-    Adapter->>Adapter: Verify state parameter<br/>& authorization code
+    Adapter->>Token: Exchange authorization code<br/>POST https://okta.../oauth2/v1/token<br/>code, client_id, client_secret,<br/>code_verifier (PKCE)
     
-    Adapter->>Token: 4. Exchange authorization code<br/>POST /oauth2/v1/token<br/>code, client_id, client_secret,<br/>code_verifier (PKCE)
+    Token-->>Adapter: Returns:<br/>- access_token (JWT)<br/>- id_token<br/>- refresh_token
     
-    Token-->>Adapter: Returns:<br/>- access_token (JWT)<br/>- id_token<br/>- refresh_token<br/>- expires_in
+    Adapter->>Adapter: Validate JWT signature<br/>using Okta JWKS
     
-    Adapter->>Adapter: Validate JWT signature<br/>using JWKS
-    
-    Adapter-->>Browser: 5. Store tokens<br/>Redirect to agent success page
+    Adapter-->>Browser: 5. Redirect with tokens<br/>(or store in secure context)
     
     Browser->>Agent: Agent receives tokens<br/>& can use access_token<br/>for MCP tool calls
 
 ```
+
+**Why This Pattern?**
+- ✅ **Pre-configured credentials**: Agents don't need dynamic registration with Okta
+- ✅ **Centralized management**: Config defined in adapter (config.yaml)
+- ✅ **Enhanced discovery**: Adapter adds its own DCR endpoint to Okta's metadata
+- ✅ **Single adapter URL**: Agents only need adapter URL, not Okta URL
+- ✅ **Transparent OAuth**: Actual OAuth still happens with Okta (authorize/token endpoints)
+
+
 
 ---
 
@@ -260,11 +288,33 @@ graph LR
 - `auth/` = Token management
 - `backends/` = Backend coordination
 
-### 2. **Two Auth Methods**
+### 2. **Discovery Proxy with Pre-configured DCR**
+
+The adapter acts as a discovery proxy and DCR provider:
+
+```
+Agent discovers adapter:  /.well-known/oauth-authorization-server
+                ↓
+Adapter proxies Okta metadata + adds DCR endpoint
+                ↓
+Agent calls adapter DCR:  /oauth2/register
+                ↓
+Adapter returns pre-configured client_id from config.yaml
+                ↓
+Agent uses Okta endpoints (from metadata) with pre-configured client_id
+```
+
+**Benefits:**
+- ✅ Agents only know about adapter URL
+- ✅ Credentials centrally managed in config.yaml / Admin UI
+- ✅ No need for dynamic registration with Okta
+- ✅ OAuth still happens with Okta (transparent to agents)
+
+### 3. **Two Auth Methods**
 - **OAuth (for Agents)**: Copilot, Claude, Cursor → Okta
 - **Service Auth (for Backends)**: Gateway → Backend (static keys, basic auth, ID-JAG)
 
-### 3. **Token Exchange Pipeline**
+### 4. **Token Exchange Pipeline**
 ```
 User ID Token (from Okta OAuth)
     ↓
@@ -277,7 +327,7 @@ User ID Token (from Okta OAuth)
 [ProxyHandler adds token to backend request]
 ```
 
-### 4. **Session Management**
+### 5. **Session Management**
 - Gateway maintains MCP `Session-Id` with each backend
 - Sessions cached per backend to avoid recreating
 - Used for stateful MCP interactions
