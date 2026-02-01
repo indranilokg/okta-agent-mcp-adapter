@@ -187,21 +187,21 @@ sequenceDiagram
     Agent->>Browser: 3. Redirect to OKTA authorize<br/>(endpoint from metadata)
     
     Browser->>OktaAuth: User authentication & consent
-    OktaAuth-->>Browser: Authorization code
+    OktaAuth-->>Browser: Authorization code<br/>redirect to redirect_uri
     
-    Browser->>Adapter: 4. Redirect to ADAPTER callback<br/>GET /oauth2/callback?code&state<br/>(redirect_uri = adapter endpoint)
+    Browser->>Agent: 4. Redirect callback to AGENT<br/>GET http://localhost:*/callback?code&state<br/>(redirect_uri = agent's local endpoint)
     
-    Adapter->>OktaToken: (Backend-for-Frontend)<br/>Exchange auth code at Okta<br/>(Agent never sees Okta token endpoint)
+    Agent->>Adapter: 5. Exchange auth code at ADAPTER<br/>POST /oauth2/v1/token<br/>(token_endpoint from metadata)<br/>code, client_id, redirect_uri, code_verifier
+    
+    Adapter->>OktaToken: (Backend-for-Frontend)<br/>Exchange code at Okta<br/>(Agent uses adapter token endpoint)<br/>Adapter proxies to Okta
     
     OktaToken-->>Adapter: Returns tokens
     
     Adapter->>Adapter: Validate JWT signature<br/>using Okta JWKS
     
-    Adapter-->>Browser: 5. Redirect with tokens
+    Adapter-->>Agent: 6. Return tokens to agent<br/>- access_token (ID token for ID-JAG)<br/>- refresh_token<br/>- id_token
     
-    Browser->>Agent: Agent has tokens<br/>Ready for MCP calls
-    
-    Note over Adapter,OktaToken: ⚠️ Token endpoint is HIDDEN<br/>Only adapter calls Okta token endpoint
+    Note over Agent,OktaToken: ⚠️ Agent's redirect_uri is local<br/>Token endpoint is Adapter (from metadata)
 ```
 
 **BFF Pattern Benefits:**
