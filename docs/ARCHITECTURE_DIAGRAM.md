@@ -200,8 +200,6 @@ sequenceDiagram
     Adapter->>Adapter: Validate JWT signature<br/>using Okta JWKS
     
     Adapter-->>Agent: 6. Return tokens to agent<br/>- access_token (ID token for ID-JAG)<br/>- refresh_token<br/>- id_token
-    
-    Note over Agent,OktaToken: ⚠️ Agent's redirect_uri is local<br/>Token endpoint is Adapter (from metadata)
 ```
 
 **BFF Pattern Benefits:**
