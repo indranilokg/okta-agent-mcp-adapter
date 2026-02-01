@@ -1,4 +1,4 @@
-# Okta Agent Proxy - Architecture
+# Okta MCP Adapter - Architecture
 
 ## System Overview
 
@@ -10,7 +10,7 @@ graph TB
         Copilot["Copilot"]
     end
 
-    subgraph Gateway["🌐 Okta Agent Proxy Gateway"]
+    subgraph Adapter["🌐 Okta MCP Adapter"]
         Main["main.py<br/>Entry Point"]
         
         subgraph Auth["🔑 Authentication Layer"]
@@ -89,7 +89,7 @@ graph TB
     AuthServer -->|Issue tokens| Cache
     JWKS -->|Public keys| Validator
     
-    style Gateway fill:#e1f5ff
+    style Adapter fill:#e1f5ff
     style Auth fill:#fff3e0
     style Routing fill:#f3e5f5
     style Exchange fill:#e8f5e9
@@ -146,12 +146,52 @@ graph TB
 
 ---
 
+## Frontend Login Flow: Agent Authentication
+
+```mermaid
+sequenceDiagram
+    participant Agent as Claude Code<br/>MCP Agent
+    participant Browser as Browser<br/>OAuth Redirect
+    participant Adapter as Okta MCP Adapter<br/>OAuth Endpoints
+    participant Discovery as Okta Discovery<br/>/.well-known/oauth-*
+    participant AuthzServer as Okta<br/>Authorization Server
+    participant Token as Okta<br/>Token Endpoint
+
+    Agent->>Discovery: 1. Fetch adapter discovery metadata<br/>/.well-known/oauth-authorization-server
+    
+    Discovery-->>Agent: Returns:<br/>- authorize_endpoint<br/>- token_endpoint<br/>- redirect_uris
+    
+    Agent->>Agent: Generate PKCE code<br/>& state parameter
+    
+    Agent->>Browser: 2. Redirect to authorization endpoint<br/>GET /oauth2/authorize?<br/>client_id, redirect_uri,<br/>scope, state, code_challenge
+    
+    Browser->>AuthzServer: User authentication & consent
+    AuthzServer-->>Browser: Authorization code
+    
+    Browser->>Adapter: 3. Redirect callback<br/>GET /oauth2/callback?code&state
+    
+    Adapter->>Adapter: Verify state parameter<br/>& authorization code
+    
+    Adapter->>Token: 4. Exchange authorization code<br/>POST /oauth2/v1/token<br/>code, client_id, client_secret,<br/>code_verifier (PKCE)
+    
+    Token-->>Adapter: Returns:<br/>- access_token (JWT)<br/>- id_token<br/>- refresh_token<br/>- expires_in
+    
+    Adapter->>Adapter: Validate JWT signature<br/>using JWKS
+    
+    Adapter-->>Browser: 5. Store tokens<br/>Redirect to agent success page
+    
+    Browser->>Agent: Agent receives tokens<br/>& can use access_token<br/>for MCP tool calls
+
+```
+
+---
+
 ## Request Flow Example: `tools/list`
 
 ```mermaid
 sequenceDiagram
     participant Client as Copilot
-    participant GW as Gateway<br/>main.py
+    participant GW as Okta MCP Adapter<br/>main.py
     participant Auth as OktaTokenValidator
     participant Router as ProxyHandler
     participant Exchanger as OktaCrossAppAccessManager
@@ -247,7 +287,7 @@ User ID Token (from Okta OAuth)
 ## File Structure
 
 ```
-okta-agent-proxy/
+okta-mcp-adapter/
 ├── main.py                              # Entry point, HTTP/FastMCP
 ├── config.py                            # Pydantic config models
 ├── auth/
