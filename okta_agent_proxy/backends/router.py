@@ -295,6 +295,12 @@ class BackendRouter:
                 # Uses agent credentials for JWT signing, exchanges ID token for MCP token
                 logger.debug(f"Using simple ID-JAG flow (Okta AI SDK) for {backend_name}")
                 
+                # Check if agent_config is available
+                if not agent_config:
+                    logger.error(f"Cannot use simple ID-JAG flow: agent_config not provided")
+                    logger.info(f"Static ID-JAG requires an explicit agent via X-MCP-Agent header")
+                    return None
+                
                 # Initialize cross-app access manager if not already done
                 # Pass agent credentials from agent_config (can be dict or object)
                 # Extract agent credentials from agent_config

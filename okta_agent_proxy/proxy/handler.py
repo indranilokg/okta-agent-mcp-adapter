@@ -175,13 +175,13 @@ class ProxyHandler:
                 logger.debug(f"Agent not in header, attempting fallback lookup by token aud: {token_aud}")
                 all_agents = self.store.get_all_agents(enabled_only=False)
                 matches = []
-                for agent_name in all_agents:
-                    agent = self.store.get_agent(agent_name)
-                    if agent:
-                        # Handle both dict and object types
-                        agent_client_id = agent.get("client_id") if isinstance(agent, dict) else agent.client_id
+                for agent_dict in all_agents:
+                    # all_agents returns list of dicts with agent_id and client_id
+                    if agent_dict:
+                        agent_id_from_list = agent_dict.get("agent_id")
+                        agent_client_id = agent_dict.get("client_id")
                         if agent_client_id == token_aud:
-                            matches.append((agent_name, agent))
+                            matches.append((agent_id_from_list, agent_dict))
                 
                 if len(matches) == 1:
                     agent_id, agent_config = matches[0]

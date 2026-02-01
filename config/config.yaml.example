@@ -1,38 +1,109 @@
-# Okta MCP Gateway Configuration
+# Okta MCP Adapter Configuration Template
+# 
+# This file defines:
+# - Backends: Remote MCP servers to proxy to
+# - Agents: MCP clients (Cursor, Claude Code, etc.) with their credentials
+#
+# IMPORTANT: Do NOT commit actual config.yaml with real secrets.
+# Use this template and fill in your own values in a local config.yaml
+#
+# For database-driven configuration in production, see docs/DATABASE_CONFIG.md
 
-gateway:
-  name: "Okta MCP Gateway"
-  version: "1.0.0"
-  description: "Okta-secured MCP proxy gateway"
-  host: "0.0.0.0"
-  port: 8000
-  scheme: "https"
-
-# Token cache settings
-cache:
-  backend_tokens:
-    max_size: 50000
-    ttl_seconds: 3600  # 1 hour
-
-# Backend MCP servers
 backends:
-  employees:
-    name: "employees"
-    url: "https://okta-sample-employee-mcp-server.onrender.com"
+  hr-system:
+    url: http://localhost:8001/mcp
     paths:
-      - "/hr"
-      - "/employees"
-    description: "Employee management MCP server"
-    timeout_seconds: 30
-    auth_method: "okta-cross-app"
+      - /hr
+    auth_method: okta-cross-app
     auth_config:
-      authorization_server_id: "mcp_employees_server"
-      scopes:
-        - "mcp:read"
-        - "mcp:write"
+      id_jag_mode: static
+      target_authorization_server: https://{OKTA_DOMAIN}/oauth2/{AUTH_SERVER_ID}
+      target_audience: https://hr.mcp.streamward.com
+    description: Okta Sample HR System MCP Server
+    timeout_seconds: 30
+    enabled: true
 
-# Logging
-logging:
-  level: "INFO"
-  format: "json"
+  finance-system:
+    url: http://localhost:8002/mcp
+    paths:
+      - /finance-system
+    auth_method: okta-cross-app
+    auth_config:
+      id_jag_mode: static
+      target_authorization_server: https://{OKTA_DOMAIN}/oauth2/{AUTH_SERVER_ID}
+      target_audience: https://finance.mcp.streamward.com
+    description: Finance System MCP Server (SAP-like)
+    timeout_seconds: 30
+    enabled: true
 
+  analytics-system:
+    url: http://localhost:8003/mcp
+    paths:
+      - /analytics-system
+    auth_method: static-key
+    auth_config:
+      api_key: "{ANALYTICS_API_KEY}"
+    description: Analytics System MCP Server (DataDog-like)
+    timeout_seconds: 30
+    enabled: true
+
+  ticketing-system:
+    url: http://localhost:8004/mcp
+    paths:
+      - /ticketing-system
+    auth_method: static-key
+    auth_config:
+      api_key: "{TICKETING_API_KEY}"
+    description: Ticketing System MCP Server (Jira-like)
+    timeout_seconds: 30
+    enabled: true
+
+agents:
+  copilot:
+    agent_id: {AGENT_ID}
+    # OAuth client credentials for user authentication (frontend login)
+    client_id: {CLIENT_ID}
+    client_secret: {CLIENT_SECRET}
+    # Private key for JWT signing (cross-app access) - MUST be in JWK format
+    private_key: '{
+      "alg": "RS256",
+      "kty": "RSA",
+      "use": "sig",
+      "kid": "{KID}",
+      "n": "{RSA_N}",
+      "e": "AQAB",
+      "d": "{RSA_D}",
+      "p": "{RSA_P}",
+      "q": "{RSA_Q}",
+      "dp": "{RSA_DP}",
+      "dq": "{RSA_DQ}",
+      "qi": "{RSA_QI}"
+    }'
+    backend_access:
+      - hr-system
+    enabled: true
+
+  claude-code:
+    agent_id: {AGENT_ID}
+    # OAuth client credentials for user authentication (frontend login)
+    client_id: {CLIENT_ID}
+    client_secret: {CLIENT_SECRET}
+    # Private key for JWT signing (cross-app access) - MUST be in JWK format
+    private_key: '{
+      "alg": "RS256",
+      "kty": "RSA",
+      "use": "sig",
+      "kid": "{KID}",
+      "n": "{RSA_N}",
+      "e": "AQAB",
+      "d": "{RSA_D}",
+      "p": "{RSA_P}",
+      "q": "{RSA_Q}",
+      "dp": "{RSA_DP}",
+      "dq": "{RSA_DQ}",
+      "qi": "{RSA_QI}"
+    }'
+    backend_access:
+      - hr-system
+      - finance-system
+    enabled: true
