@@ -14,8 +14,9 @@ fi
 PORT=${PORT:-8000}
 echo "Starting on port: $PORT"
 
-# Set GATEWAY_PORT before importing Python modules
+# Set environment variables for Render
 export GATEWAY_PORT=$PORT
+export GATEWAY_HOST=0.0.0.0
 
 # Run the FastMCP app with http transport
 exec python -m okta_agent_proxy.main http
