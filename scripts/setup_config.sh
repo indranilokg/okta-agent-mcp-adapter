@@ -13,6 +13,4 @@ fi
 PORT=${PORT:-8000}
 echo "Starting on port $PORT"
 
-# Run the app with proper environment variables
-GATEWAY_PORT=$PORT \
-python -m okta_agent_proxy.main http
+uvicorn okta_agent_proxy.main:app --host 0.0.0.0 --port $PORT 
