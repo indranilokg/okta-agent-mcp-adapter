@@ -14,9 +14,8 @@ fi
 PORT=${PORT:-8000}
 echo "Starting on port: $PORT"
 
-# IMPORTANT: Set GATEWAY_PORT BEFORE importing any Python modules
-# This ensures the config loads with the correct port
+# Set GATEWAY_PORT before importing Python modules
 export GATEWAY_PORT=$PORT
 
-# Run uvicorn with explicit environment variable
-exec uvicorn okta_agent_proxy.main:app --host 0.0.0.0 --port $PORT
+# Run the FastMCP app with http transport
+exec python -m okta_agent_proxy.main http
