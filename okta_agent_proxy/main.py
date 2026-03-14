@@ -44,6 +44,10 @@ config = load_config()
 # Initialize backend configuration store (Phase 1B)
 # Loads backends and agents from YAML, stores in SQLite in-memory database
 config_path = os.getenv("CONFIG_PATH", "config/config.yaml")
+# When True (default), tools/list without auth returns 401 to trigger OAuth. When False, allows unauthenticated discovery (e.g. for gateway target registration).
+_protected_discovery_raw = os.getenv("PROTECTED_DISCOVERY", "true").strip().lower()
+PROTECTED_DISCOVERY = _protected_discovery_raw in ("true", "1", "yes")
+logger.info(f"PROTECTED_DISCOVERY={PROTECTED_DISCOVERY} (tools/list without auth: {'401 OAuth' if PROTECTED_DISCOVERY else 'forward or empty tools'})")
 store = InMemoryBackendStore(config_path)
 logger.info(f"Loaded {len(store.get_all_backends())} backends from {config_path}")
 logger.info(f"Loaded {len(store.get_all_agents(enabled_only=False))} agents from {config_path}")
@@ -616,20 +620,57 @@ def run(
                                 "id": request_id
                             })
                     
-                    # Discovery methods - require auth to forward to backend
+                    # Discovery methods - require auth to forward to backend (unless PROTECTED_DISCOVERY=false for tools/list)
                     if method in ["tools/list", "resources/list", "prompts/list"]:
                         auth_header = request.headers.get("authorization")
                         if not auth_header:
-                            # Only return 401 for tools/list to trigger OAuth ONCE
                             if method == "tools/list":
-                                logger.info(f"Discovery request {method} without auth, returning 401 to trigger OAuth")
-                                return JSONResponse(
-                                    {"error": "Unauthorized"},
-                                    status_code=401,
-                                    headers={
-                                        "WWW-Authenticate": f'Bearer realm="{config.gateway.gateway_base_url}", error="invalid_token"'
-                                    }
-                                )
+                                if PROTECTED_DISCOVERY:
+                                    logger.info(f"Discovery request {method} without auth, returning 401 to trigger OAuth (PROTECTED_DISCOVERY=true)")
+                                    return JSONResponse(
+                                        {"error": "Unauthorized"},
+                                        status_code=401,
+                                        headers={
+                                            "WWW-Authenticate": f'Bearer realm="{config.gateway.gateway_base_url}", error="invalid_token"'
+                                        }
+                                    )
+                                # PROTECTED_DISCOVERY=false: allow unauthenticated tools/list for gateway registration
+                                path_for_backend = "/" + (request_path or "").strip("/") or "/"
+                                backend_name = router.get_backend_for_path(path_for_backend)
+                                backend_url = router.get_backend_url(backend_name) if backend_name else None
+                                if backend_name and backend_url:
+                                    try:
+                                        discovery_body = {
+                                            "jsonrpc": "2.0",
+                                            "id": body.get("id", "discovery"),
+                                            "method": "tools/list",
+                                            "params": body.get("params") or {}
+                                        }
+                                        async with httpx.AsyncClient(timeout=15.0) as client:
+                                            discovery_resp = await client.post(
+                                                backend_url,
+                                                json=discovery_body,
+                                                headers={"Content-Type": "application/json"}
+                                            )
+                                        if discovery_resp.status_code == 200:
+                                            raw = discovery_resp.text
+                                            first_line = (raw.split("\n")[0] or "").strip()
+                                            data = json.loads(first_line) if first_line else {}
+                                            if "result" in data and "tools" in data["result"]:
+                                                logger.info(f"Discovery tools/list (no auth, PROTECTED_DISCOVERY=false): returning {len(data['result']['tools'])} tools")
+                                                return JSONResponse({
+                                                    "jsonrpc": "2.0",
+                                                    "id": body.get("id"),
+                                                    "result": data["result"]
+                                                })
+                                    except Exception as e:
+                                        logger.warning(f"Discovery tools/list to backend failed: {e}")
+                                logger.info("Discovery tools/list without auth (PROTECTED_DISCOVERY=false): returning empty tools for gateway registration")
+                                return JSONResponse({
+                                    "jsonrpc": "2.0",
+                                    "id": body.get("id"),
+                                    "result": {"tools": []}
+                                })
                             else:
                                 # For other discovery methods, return empty results (client will retry after OAuth)
                                 logger.info(f"Discovery request {method} without auth, returning empty result")

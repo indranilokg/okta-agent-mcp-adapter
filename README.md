@@ -41,6 +41,8 @@ OKTA_DOMAIN=dev-12345.okta.com
 GATEWAY_BASE_URL=http://localhost:8000
 GATEWAY_PORT=8000
 LOG_LEVEL=INFO
+# When true (default), tools/list without auth returns 401 to trigger OAuth. When false, allows unauthenticated tools/list (e.g. for AgentCore gateway target registration).
+# PROTECTED_DISCOVERY=true
 ```
 
 **Note**: Agent credentials (client_id, private_key) are configured in `config/config.yaml`, not in `.env`
