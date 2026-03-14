@@ -560,7 +560,7 @@ def run(
                             "jsonrpc": "2.0",
                             "id": body.get("id"),
                             "result": {
-                                "protocolVersion": "2025-11-25",
+                                "protocolVersion": "2024-11-05",
                                 "capabilities": {
                                     "tools": {},
                                     "resources": {
