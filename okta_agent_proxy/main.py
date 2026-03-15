@@ -45,7 +45,7 @@ config = load_config()
 # Loads backends and agents from YAML, stores in SQLite in-memory database
 config_path = os.getenv("CONFIG_PATH", "config/config.yaml")
 # When True (default), tools/list without auth returns 401 to trigger OAuth. When False, allows unauthenticated discovery (e.g. for gateway target registration).
-_protected_discovery_raw = os.getenv("PROTECTED_DISCOVERY", "true").strip().lower()
+_protected_discovery_raw = (config.gateway.protected_discovery or "true").strip().lower()
 PROTECTED_DISCOVERY = _protected_discovery_raw in ("true", "1", "yes")
 logger.info(f"PROTECTED_DISCOVERY={PROTECTED_DISCOVERY} (tools/list without auth: {'401 OAuth' if PROTECTED_DISCOVERY else 'forward or empty tools'})")
 store = InMemoryBackendStore(config_path)

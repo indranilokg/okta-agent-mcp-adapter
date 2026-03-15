@@ -4,7 +4,7 @@ Configuration management for MCP Gateway
 
 import os
 from typing import Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings
 import yaml
 from dotenv import load_dotenv
@@ -135,6 +135,8 @@ class GatewaySettings(BaseSettings):
     - OKTA_CLIENT_ID, OKTA_CLIENT_SECRET: Optional (agent credentials are in config.yaml)
     - OKTA_ISSUER: Optional (derived from OKTA_DOMAIN if not set)
     """
+    model_config = ConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
+
     okta_domain: str = Field(alias="OKTA_DOMAIN")
     okta_client_id: Optional[str] = Field(alias="OKTA_CLIENT_ID", default=None)
     okta_client_secret: Optional[str] = Field(alias="OKTA_CLIENT_SECRET", default=None)
@@ -145,10 +147,8 @@ class GatewaySettings(BaseSettings):
     gateway_port: int = Field(alias="GATEWAY_PORT", default=8000)
     
     log_level: str = Field(alias="LOG_LEVEL", default="INFO")
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    # When True (default), tools/list without auth returns 401. When False, allows unauthenticated discovery.
+    protected_discovery: str = Field(alias="PROTECTED_DISCOVERY", default="true")
     
     @property
     def issuer(self) -> str:
