@@ -364,6 +364,7 @@ def run(
                     agent_config = config.agents[agent_name]
                     registration_info = {
                         "client_id": agent_config.client_id,
+                        "client_name": f"Okta Agent Proxy - {agent_name}",
                         "redirect_uris": ["http://localhost:*/callback", "http://127.0.0.1:*/callback", "https://vscode.dev/redirect"],
                         "response_types": ["code", "id_token", "token"],
                         "grant_types": ["authorization_code", "refresh_token"],
@@ -443,6 +444,7 @@ def run(
                         # Copilot will use PKCE (code_challenge) for secure token exchange
                         response_data = {
                             "client_id": agent_config.client_id,
+                            "client_name": client_name,
                             "client_id_issued_at": int(__import__('time').time()),
                             "client_secret_expires_at": 0,
                             "redirect_uris": filtered_redirect_uris,
@@ -454,7 +456,7 @@ def run(
                         
                         # Do NOT include client_secret - Copilot is a public client using PKCE
                         
-                        logger.info(f"Returning DCR response: client_id={response_data['client_id']}, auth_method=none (PKCE), app_type={application_type}, redirect_uris={filtered_redirect_uris}")
+                        logger.info(f"Returning DCR response: client_id={response_data['client_id']}, client_name={response_data['client_name']}, auth_method=none (PKCE), app_type={application_type}, redirect_uris={filtered_redirect_uris}")
                         return JSONResponse(response_data, status_code=201)
                     else:
                         logger.warning(f"Agent '{agent_name}' not found. Available: {list(config.agents.keys())}")
@@ -471,6 +473,7 @@ def run(
                         # Use known valid redirect URIs for fallback
                         response_data = {
                             "client_id": agent_config.client_id,
+                            "client_name": f"Okta Agent Proxy - {agent_name}",
                             "client_id_issued_at": int(__import__('time').time()),
                             "client_secret_expires_at": 0,
                             "redirect_uris": ["https://vscode.dev/redirect", "http://127.0.0.1:33418"],
